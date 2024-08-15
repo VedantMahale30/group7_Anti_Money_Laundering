@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation Template for Glue Job and Lambda Functions
+
+Resources:
+  LambdaInvokeCrawler:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: 'InvokeGlueCrawler'
+      Handler: LambdaCodeRunCrawler.lambda_handler
+      Role: arn:aws:iam::034552991439:role/LabRole  # Reference your existing role
+      Runtime: python3.9
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          
+          glue=boto3.client('glue')
+          
+          def lambda_handler(event, context):
+              response = glue.start_crawler(
+                  Name='project_crawler1'            #  Replace with your actual Glue Crawler name
+              )
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('Crawler started')
+              }
+
+  GlueJob:
+    Type: 'AWS::Glue::Job'
+    Properties:
+      Name: 'DataPreparationJob'
+      Role: arn:aws:iam::034552991439:role/LabRole  # Reference your existing role
+      Command:
+        Name: 'glueetl'
+        ScriptLocation: 's3://bb07scripts/FinalScriptgluejob.py'
+        PythonVersion: '3'
+      DefaultArguments:
+        '--job-language': 'python'
+      MaxRetries: 1
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+
+   LambdaInvokeGlueJob:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: 'InvokeGlueJob'
+      Handler: 'LambdaCodeRunGlueJob.lambda_handler'
+      Role: arn:aws:iam::034552991439:role/LabRole  # Reference your existing role
+      Runtime: 'python3.9'
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          
+          glue = boto3.client('glue')
+          
+          def lambda_handler(event, context):
+              response = glue.start_job_run(JobName="")  # Make sure this Glue Job exists
+              print("Glue Job started")
+              return {
+                  'statusCode': 200,
+                  'body': json.dumps('Job started')
+              }
+
+      Tags:  # Adding tags here
+      - Key: Name
+        Value: LambdaInvokeGlueJob
+
+
